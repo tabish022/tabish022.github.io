@@ -4,12 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tabish Afzal — Data Analyst</title>
-<meta name="description" content="Portfolio of Tabish Afzal, Data Analyst skilled in SQL, Power BI, Excel and Python.">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Tabish Afzal — Data Analyst">
-<meta property="og:description" content="Data Analyst portfolio: SQL, Power BI, Excel and Python projects, certifications and resume.">
-<meta name="theme-color" content="#E2E2E2">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
+<meta name="google-site-verification" content="SHVj2pFttOz-56SWyT62Vy53Rqas_87b1YeBtp6Urbo" />
 <meta name="robots" content="index,follow">
 <meta name="theme-color" content="#E2E2E2">
 <meta property="og:type" content="website">
@@ -17,6 +12,12 @@
 <meta property="og:description" content="Portfolio of Tabish Afzal: SQL, Power BI, Excel and Python projects, certifications and resume.">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230C0C0C'/%3E%3Ctext x='50' y='66' font-size='46' font-family='Arial Black,Arial' font-weight='900' text-anchor='middle' fill='%23F5F5F5'%3ETA%3C/text%3E%3C/svg%3E">
+<meta name="description" content="Portfolio of Tabish Afzal, Data Analyst skilled in SQL, Power BI, Excel and Python.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Tabish Afzal — Data Analyst">
+<meta property="og:description" content="Data Analyst portfolio: SQL, Power BI, Excel and Python projects, certifications and resume.">
+<meta name="theme-color" content="#E2E2E2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -410,6 +411,7 @@ footer.site{margin-top:0;padding:22px clamp(16px,3.5vw,48px) 26px;border-top:1px
         <label>Name<input name="name" id="cName" autocomplete="name" required></label>
         <label>Email<input name="email" id="cEmail" type="email" autocomplete="email" required></label>
         <label>Message<textarea name="message" id="cMsg" required></textarea></label>
+        <input type="checkbox" id="cBot" name="botcheck" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
         <button class="btn btn-black" type="submit" style="justify-self:start">Send message</button>
         <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
       </form>
@@ -449,7 +451,8 @@ const CONFIG = {
   location: "Lucknow, Uttar Pradesh, India",
   linkedin: "https://www.linkedin.com/in/tabish-afzal",
   github: "https://github.com/tabish022",
-  formEndpoint: "",                // e.g. a Formspree / Web3Forms URL. Empty opens the visitor's email app instead.
+  formEndpoint: "https://api.web3forms.com/submit",   // contact form service (Web3Forms)
+  formAccessKey: "8da612fc-81be-446f-b53a-d5e50e3b019a",
   resumeFile: "Tabish_Afzal_Resume.pdf"
 };
 
@@ -781,21 +784,30 @@ $("#contactList").innerHTML = [
 $("#contactForm").addEventListener("submit", async ev => {
   ev.preventDefault();
   const st = $("#formStatus"); st.className = "form-status";
+  const btn = ev.target.querySelector('button[type="submit"]');
   const name = $("#cName").value.trim(), email = $("#cEmail").value.trim(), msg = $("#cMsg").value.trim();
   if (!name || !email || !msg) { st.classList.add("err"); st.textContent = "Please fill in your name, email and message."; return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { st.classList.add("err"); st.textContent = "Please enter a valid email address."; $("#cEmail").focus(); return; }
-  if (CONFIG.formEndpoint) {
+  if ($("#cBot").checked) { st.textContent = "Message sent. Thank you, I'll reply by email."; return; }   // hidden spam trap
+  const subject = "Portfolio message from " + name;
+  let tried = false;
+  if (CONFIG.formEndpoint && CONFIG.formAccessKey) {
+    tried = true;
+    const label = btn.textContent; btn.disabled = true; btn.textContent = "Sending…"; st.textContent = "";
     try {
-      const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ name, email, message: msg }) });
-      if (!r.ok) throw new Error("bad status");
+      const r = await fetch(CONFIG.formEndpoint, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ access_key: CONFIG.formAccessKey, subject, from_name: "Portfolio contact form", name, email, message: msg }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.success === false) throw new Error(d.message || "bad status");
+      btn.disabled = false; btn.textContent = label;
       st.textContent = "Message sent. Thank you, I'll reply by email."; $("#contactForm").reset();
-    } catch (e) { st.classList.add("err"); st.textContent = `The message could not be sent. Please email ${CONFIG.email} directly.`; }
-    return;
+      return;
+    } catch (e) { btn.disabled = false; btn.textContent = label; }
   }
-  const subject = "Portfolio message from " + name, body = msg + "\n\nFrom: " + name + " (" + email + ")";
+  const body = msg + "\n\nFrom: " + name + " (" + email + ")";
   const gmail = gmailUrl(subject, body);
   const mail = `mailto:${CONFIG.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  st.innerHTML = `Opening Gmail with your message ready. If nothing opened, <a href="${esc(gmail)}" target="_blank" rel="noopener">open Gmail</a> or <a href="${esc(mail)}">use your email app</a>.`;
+  st.innerHTML = `${tried ? "The message could not be sent directly, so I'm opening Gmail with it ready instead. " : "Opening Gmail with your message ready. "}If nothing opened, <a href="${esc(gmail)}" target="_blank" rel="noopener">open Gmail</a> or <a href="${esc(mail)}">use your email app</a>.`;
   try { window.open(gmail, "_blank", "noopener"); } catch (e) {}
 });
 
